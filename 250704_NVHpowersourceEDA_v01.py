@@ -24,10 +24,12 @@ if uploaded_zip and merge_button:
                     continue
                 with z.open(filename) as f:
                     df = pd.read_csv(f, header=None)
+                    if df.shape[1] < 3:
+                        continue
                     df.columns = ['Timestamp', 'MachineStatus', 'Value']
                     df['Timestamp'] = df['Timestamp'].astype(str).str.replace('Z','', regex=False)
-                    df['Date'] = pd.to_datetime(df['Timestamp']).dt.date
-                    df['Time'] = pd.to_datetime(df['Timestamp']).dt.time
+                    df['Date'] = pd.to_datetime(df['Timestamp'], errors='coerce').dt.date
+                    df['Time'] = pd.to_datetime(df['Timestamp'], errors='coerce').dt.time
                     stat_split = df['MachineStatus'].astype(str).str.split('.', n=1, expand=True)
                     df['Stat1'] = stat_split[0]
                     df['Stat2'] = stat_split[1]
@@ -43,16 +45,19 @@ if uploaded_zip and merge_button:
         merged_df.to_csv(csv_buffer, index=False)
         st.download_button("Download Merged CSV", data=csv_buffer.getvalue(), file_name="merged_welding_data.csv", mime="text/csv")
 
-        with st.sidebar:
-            agg_option = st.selectbox("Aggregation for Visualization", ["SUM", "AVERAGE"])
-
         st.subheader("Global EDA Visualization")
+
+        with st.sidebar:
+            agg_option = st.radio("Select aggregation method for visualization:", ["SUM", "AVERAGE"], index=0)
+
         for stat1 in merged_df['Stat1'].dropna().unique():
             with st.expander(f"Stat1: {stat1}"):
                 filtered_df = merged_df[merged_df['Stat1'] == stat1]
-                if agg_option == "SUM":
-                    agg_df = filtered_df.groupby('Stat2')['Value'].sum().reset_index()
-                else:
-                    agg_df = filtered_df.groupby('Stat2')['Value'].mean().reset_index()
-                fig = px.bar(agg_df, x='Stat2', y='Value', title=f"{stat1} - {agg_option} of Value by Stat2")
-                st.plotly_chart(fig, use_container_width=True)
+                if not filtered_df.empty:
+                    if agg_option == "SUM":
+                        agg_df = filtered_df.groupby('Stat2', dropna=False)['Value'].sum().reset_index()
+                    else:
+                        agg_df = filtered_df.groupby('Stat2', dropna=False)['Value'].mean().reset_index()
+                    agg_df = agg_df.sort_values(by='Value', ascending=False)
+                    fig = px.bar(agg_df, x='Stat2', y='Value', title=f"{stat1} - {agg_option} of Value by Stat2", labels={'Value': f"Value ({agg_option})"})
+                    st.plotly_chart(fig, use_container_width=True)
