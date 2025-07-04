@@ -11,6 +11,9 @@ with st.sidebar:
     uploaded_zip = st.file_uploader("Upload ZIP containing CSV files", type="zip")
     merge_button = st.button("Merge Data")
 
+if 'merged_df' not in st.session_state:
+    st.session_state.merged_df = None
+
 if uploaded_zip and merge_button:
     merged_df_list = []
     with zipfile.ZipFile(uploaded_zip) as z:
@@ -40,24 +43,29 @@ if uploaded_zip and merge_button:
     if merged_df_list:
         merged_df = pd.concat(merged_df_list, ignore_index=True)
         merged_df = merged_df[['FileDate', 'FileSerial', 'Date', 'Time', 'Timestamp', 'MachineStatus', 'Stat1', 'Stat2', 'Value']]
-        st.dataframe(merged_df)
-        csv_buffer = io.StringIO()
-        merged_df.to_csv(csv_buffer, index=False)
-        st.download_button("Download Merged CSV", data=csv_buffer.getvalue(), file_name="merged_welding_data.csv", mime="text/csv")
+        st.session_state.merged_df = merged_df
 
-        st.subheader("Global EDA Visualization")
+if st.session_state.merged_df is not None:
+    merged_df = st.session_state.merged_df
+    st.dataframe(merged_df)
+    csv_buffer = io.StringIO()
+    merged_df.to_csv(csv_buffer, index=False)
+    st.download_button("Download Merged CSV", data=csv_buffer.getvalue(), file_name="merged_welding_data.csv", mime="text/csv")
 
-        with st.sidebar:
-            agg_option = st.radio("Select aggregation method for visualization:", ["SUM", "AVERAGE"], index=0)
+    st.subheader("Global EDA Visualization")
 
-        for stat1 in merged_df['Stat1'].dropna().unique():
-            with st.expander(f"Stat1: {stat1}"):
-                filtered_df = merged_df[merged_df['Stat1'] == stat1]
-                if not filtered_df.empty:
-                    if agg_option == "SUM":
-                        agg_df = filtered_df.groupby('Stat2', dropna=False)['Value'].sum().reset_index()
-                    else:
-                        agg_df = filtered_df.groupby('Stat2', dropna=False)['Value'].mean().reset_index()
+    with st.sidebar:
+        agg_option = st.radio("Select aggregation method for visualization:", ["SUM", "AVERAGE"], index=0)
+
+    for stat1 in merged_df['Stat1'].dropna().unique():
+        with st.expander(f"Stat1: {stat1}"):
+            filtered_df = merged_df[merged_df['Stat1'] == stat1]
+            if not filtered_df.empty and filtered_df['Stat2'].notna().any():
+                grouped = filtered_df.groupby('Stat2', dropna=False)['Value']
+                if agg_option == "SUM":
+                    agg_df = grouped.sum().reset_index()
+                else:
+                    agg_df = grouped.mean().reset_index()
+                if not agg_df.empty and agg_df['Value'].notna().any():
                     agg_df = agg_df.sort_values(by='Value', ascending=False)
-                    fig = px.bar(agg_df, x='Stat2', y='Value', title=f"{stat1} - {agg_option} of Value by Stat2", labels={'Value': f"Value ({agg_option})"})
-                    st.plotly_chart(fig, use_container_width=True)
+                    fig = px.bar(agg_df, x='Stat2', y='Value', ti
