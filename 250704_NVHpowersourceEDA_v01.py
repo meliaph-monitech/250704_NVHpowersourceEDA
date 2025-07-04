@@ -68,4 +68,15 @@ if st.session_state.merged_df is not None:
                     agg_df = grouped.mean().reset_index()
                 if not agg_df.empty and agg_df['Value'].notna().any():
                     agg_df = agg_df.sort_values(by='Value', ascending=False)
-                    fig = px.bar(agg_df, x='Stat2', y='Value', ti
+                    fig = px.bar(
+                        agg_df,
+                        x='Stat2',
+                        y='Value',
+                        title=f"{stat1} - {agg_option} of Value by Stat2",
+                        labels={'Value': f"Value ({agg_option})"}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.info(f"No valid data to display for {stat1} with {agg_option}.")
+            else:
+                st.info(f"No data available for Stat1: {stat1}.")
