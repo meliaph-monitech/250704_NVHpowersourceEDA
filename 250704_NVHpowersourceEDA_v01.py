@@ -4,6 +4,7 @@ import zipfile
 import io
 import re
 import plotly.express as px
+from datetime import timedelta
 
 st.title("Welding Machine Power Source Data Merger and EDA")
 
@@ -31,8 +32,11 @@ if uploaded_zip and merge_button:
                         continue
                     df.columns = ['Timestamp', 'MachineStatus', 'Value']
                     df['Timestamp'] = df['Timestamp'].astype(str).str.replace('Z','', regex=False)
-                    df['Date'] = pd.to_datetime(df['Timestamp'], errors='coerce').dt.date
-                    df['Time'] = pd.to_datetime(df['Timestamp'], errors='coerce').dt.time
+                    df['Timestamp'] = pd.to_datetime(df['Timestamp'], errors='coerce')
+                    # Adjust timestamp by subtracting 8 hours and 53 minutes
+                    df['Timestamp'] = df['Timestamp'] - timedelta(hours=8, minutes=53)
+                    df['Date'] = df['Timestamp'].dt.date
+                    df['Time'] = df['Timestamp'].dt.time
                     stat_split = df['MachineStatus'].astype(str).str.split('.', n=1, expand=True)
                     df['Stat1'] = stat_split[0]
                     df['Stat2'] = stat_split[1]
